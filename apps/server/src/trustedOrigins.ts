@@ -67,8 +67,7 @@ export function isTrustedAppOrigin(input: {
     // scheme mismatch: the browser sends Origin: https://... but the tunnel delivers
     // the request over HTTP, so origin !== requestOrigin. Trust the browser's own
     // origin in this case and let auth/session policy handle access control.
-    (isWildcardHost(input.config.host) &&
-      isTrustedRequestOriginHost(input.origin, input.config)) ||
+    (isWildcardHost(input.config.host) && isTrustedRequestOriginHost(input.origin, input.config)) ||
     input.origin === input.config.devUrl?.origin ||
     input.origin === DESKTOP_APP_CORS_ORIGIN
   );

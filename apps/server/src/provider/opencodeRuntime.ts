@@ -473,9 +473,7 @@ export function resolveOpenCodeAuthFilePath(
   return join(resolveOpenCodeDataDirectory(pathInfo.home, cliSpec.dataDirectoryName), "auth.json");
 }
 
-export function resolveOpenCodeConfigFilePath(
-  pathInfo: Pick<OpenCodePathInfo, "config">,
-): string {
+export function resolveOpenCodeConfigFilePath(pathInfo: Pick<OpenCodePathInfo, "config">): string {
   return join(pathInfo.config, "opencode.json");
 }
 
@@ -1413,65 +1411,61 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
   const loadOpenCodeCredentialProviderIDs: OpenCodeRuntimeShape["loadOpenCodeCredentialProviderIDs"] =
     (client, cliSpec = OPENCODE_CLI_SPEC) =>
       loadOpenCodePaths(client).pipe(
-        Effect.flatMap((pathInfo) => {
-          const authProviders = Effect.tryPromise({
-            try: () => readFile(resolveOpenCodeAuthFilePath(pathInfo, cliSpec), "utf8"),
-            catch: (cause) =>
-              new OpenCodeRuntimeError({
-                operation: "readOpenCodeCredentialProviderIDs",
-                detail: openCodeRuntimeErrorDetail(cause),
-                cause,
-              }),
-          }).pipe(
-            Effect.flatMap((content) =>
-              Effect.try({
-                try: () => parseOpenCodeCredentialProviderIDs(content),
+        Effect.flatMap((pathInfo) =>
+          Effect.all(
+            [
+              Effect.tryPromise({
+                try: () => readFile(resolveOpenCodeAuthFilePath(pathInfo, cliSpec), "utf8"),
                 catch: (cause) =>
                   new OpenCodeRuntimeError({
-                    operation: "parseOpenCodeCredentialProviderIDs",
+                    operation: "readOpenCodeCredentialProviderIDs",
                     detail: openCodeRuntimeErrorDetail(cause),
                     cause,
                   }),
-              }),
-            ),
-            // Explicit credential metadata is optional. Discovery should still work when
-            // the auth file does not exist, is unreadable, or belongs to another machine.
-            Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)),
-          );
-
-          const configProviders = Effect.tryPromise({
-            try: () => readFile(resolveOpenCodeConfigFilePath(pathInfo), "utf8"),
-            catch: (cause) =>
-              new OpenCodeRuntimeError({
-                operation: "readOpenCodeConfiguredProviders",
-                detail: openCodeRuntimeErrorDetail(cause),
-                cause,
-              }),
-          }).pipe(
-            Effect.flatMap((content) =>
-              Effect.try({
-                try: () => parseOpenCodeConfiguredProviders(content),
+              }).pipe(
+                Effect.flatMap((content) =>
+                  Effect.try({
+                    try: () => parseOpenCodeCredentialProviderIDs(content),
+                    catch: (cause) =>
+                      new OpenCodeRuntimeError({
+                        operation: "parseOpenCodeCredentialProviderIDs",
+                        detail: openCodeRuntimeErrorDetail(cause),
+                        cause,
+                      }),
+                  }),
+                ),
+              ),
+              Effect.tryPromise({
+                try: () => readFile(resolveOpenCodeConfigFilePath(pathInfo), "utf8"),
                 catch: (cause) =>
                   new OpenCodeRuntimeError({
-                    operation: "parseOpenCodeConfiguredProviders",
+                    operation: "readOpenCodeConfiguredProviders",
                     detail: openCodeRuntimeErrorDetail(cause),
                     cause,
                   }),
-              }),
-            ),
-            // Config file is optional.
-            Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)),
-          );
-
-          return Effect.all([authProviders, configProviders], {
-            concurrency: "unbounded",
-          }).pipe(
+              }).pipe(
+                Effect.flatMap((content) =>
+                  Effect.try({
+                    try: () => parseOpenCodeConfiguredProviders(content),
+                    catch: (cause) =>
+                      new OpenCodeRuntimeError({
+                        operation: "parseOpenCodeConfiguredProviders",
+                        detail: openCodeRuntimeErrorDetail(cause),
+                        cause,
+                      }),
+                  }),
+                ),
+              ),
+            ],
+            { concurrency: "unbounded" },
+          ).pipe(
             Effect.map(([auth, config]) => {
               const merged = new Set([...auth, ...config]);
               return [...merged].toSorted((left, right) => left.localeCompare(right));
             }),
-          );
-        }),
+          ),
+        ),
+        Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)),
       );
 
   return {

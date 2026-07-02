@@ -149,9 +149,7 @@ export class WsTransport {
     this.overrideUrl = url;
     // Force reconnect by rejecting the current client promise so getClient()
     // falls through to reconnect(), which creates a session with the new URL.
-    this.clientPromise = Promise.reject(
-      new Error("Switching WebSocket endpoint"),
-    );
+    this.clientPromise = Promise.reject(new Error("Switching WebSocket endpoint"));
     void this.reconnect();
   }
 
