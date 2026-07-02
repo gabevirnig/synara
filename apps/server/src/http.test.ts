@@ -282,6 +282,12 @@ describe("createHttpRequestHandler", () => {
         config,
         url: new URL("http://127.0.0.1:3773/attachments/attachment-id?token=wrong"),
       }),
+    ).toBe(true);
+    expect(
+      isLegacyTokenAuthorized({
+        config,
+        url: new URL("http://api-synara.virnig.co/attachments/attachment-id?token=wrong"),
+      }),
     ).toBe(false);
   });
 
