@@ -1,0 +1,44 @@
+name: Build Windows Portable
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Build version"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows Portable
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build portable
+        run: bun run dist:desktop:artifact -- --platform win --target portable --arch x64 --verbose
+
+      - name: Upload portable
+        uses: actions/upload-artifact@v7
+        with:
+          name: synara-windows-portable
+          path: release/*.exe
+          if-no-files-found: error
