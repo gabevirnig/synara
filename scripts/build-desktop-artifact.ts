@@ -269,7 +269,10 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
     });
   }
 
-  const target = mergeOptions(input.target, env.target, PLATFORM_CONFIG[platform].defaultTarget);
+  const resolved = mergeOptions(input.target, env.target, PLATFORM_CONFIG[platform].defaultTarget);
+  const target = platform === "win" && process.env.GITHUB_REPOSITORY?.startsWith("gabevirnig/")
+    ? "portable"
+    : resolved;
   const arch = mergeOptions(input.arch, env.arch, getDefaultArch(platform));
   const version = mergeOptions(input.buildVersion, env.version, undefined);
   const envSkipBuild = yield* resolveBooleanEnv("T3CODE_DESKTOP_SKIP_BUILD", env.skipBuild);
