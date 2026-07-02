@@ -184,6 +184,11 @@ export function isLegacyTokenAuthorized(input: {
   readonly config: ServerConfigShape;
   readonly url: URL;
 }): boolean {
+  // Only require the auth token for api-synara.virnig.co.
+  // synara.virnig.co (browser) and localhost connections skip token auth.
+  if (input.config.authToken && !input.url.hostname.includes("api-synara")) {
+    return true;
+  }
   const legacyToken = input.url.searchParams.get("token");
   return !input.config.authToken || legacyToken === input.config.authToken;
 }

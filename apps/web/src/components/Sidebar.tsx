@@ -31,7 +31,7 @@ import {
   XIcon,
 } from "~/lib/icons";
 import { PinStatusIcon, pinActionLabel } from "~/lib/pin";
-import { ensureNativeApi } from "~/nativeApi";
+import { ensureNativeApi, switchWsConnection } from "~/nativeApi";
 import { autoAnimate } from "@formkit/auto-animate";
 import { FiGitBranch, FiPlus } from "react-icons/fi";
 import { GoRepoForked } from "react-icons/go";
@@ -6305,6 +6305,77 @@ export default function Sidebar() {
                   />
                 ) : (
                   <>
+                    <div className="px-2 pb-2">
+                      <div className="sidebar-segmented-picker inline-flex w-full rounded-lg p-0.5">
+                        <button
+                          type="button"
+                          data-sidebar-segmented-active={
+                            appSettings.connectionMode === "local" ? "true" : undefined
+                          }
+                          className={cn(
+                            "flex-1 rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors",
+                            appSettings.connectionMode === "local"
+                              ? SIDEBAR_SEGMENTED_PICKER_ACTIVE_CLASS_NAME
+                              : "text-[var(--color-text-foreground-secondary)] hover:bg-[var(--color-background-button-secondary-hover)] hover:text-[var(--color-text-foreground)]",
+                          )}
+                          onClick={() => {
+                            if (appSettings.connectionMode === "remote") {
+                              updateSettings({ connectionMode: "local" });
+                              switchWsConnection(null);
+                              queryClient.invalidateQueries();
+                              window.localStorage.removeItem("synara:renderer-state:v8");
+                              useStore.setState({
+                                projects: [],
+                                threads: [],
+                                sidebarThreadSummaryById: {},
+                                threadsHydrated: false,
+                              });
+                            }
+                          }}
+                        >
+                          Local
+                        </button>
+                        <button
+                          type="button"
+                          data-sidebar-segmented-active={
+                            appSettings.connectionMode === "remote" ? "true" : undefined
+                          }
+                          className={cn(
+                            "flex-1 rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors",
+                            appSettings.connectionMode === "remote"
+                              ? SIDEBAR_SEGMENTED_PICKER_ACTIVE_CLASS_NAME
+                              : "text-[var(--color-text-foreground-secondary)] hover:bg-[var(--color-background-button-secondary-hover)] hover:text-[var(--color-text-foreground)]",
+                          )}
+                          onClick={() => {
+                            if (
+                              appSettings.connectionMode === "local" &&
+                              appSettings.remoteServerUrl &&
+                              appSettings.remoteServerToken
+                            ) {
+                              updateSettings({ connectionMode: "remote" });
+                              try {
+                                const url = new URL(appSettings.remoteServerUrl);
+                                const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+                                const wsUrl = `${protocol}//${url.host}/ws?token=${encodeURIComponent(appSettings.remoteServerToken)}`;
+                                switchWsConnection(wsUrl);
+                                queryClient.invalidateQueries();
+                                window.localStorage.removeItem("synara:renderer-state:v8");
+                                useStore.setState({
+                                  projects: [],
+                                  threads: [],
+                                  sidebarThreadSummaryById: {},
+                                  threadsHydrated: false,
+                                });
+                              } catch {
+                                updateSettings({ connectionMode: "local" });
+                              }
+                            }
+                          }}
+                        >
+                          Remote
+                        </button>
+                      </div>
+                    </div>
                     <SidebarPrimaryAction
                       icon={NewThreadIcon}
                       label="New thread"

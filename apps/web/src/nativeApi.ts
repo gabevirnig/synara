@@ -2,6 +2,8 @@ import type { NativeApi } from "@t3tools/contracts";
 
 import { createWsNativeApi } from "./wsNativeApi";
 
+export { switchWsConnection } from "./wsNativeApi";
+
 let cachedDesktopApi: NativeApi | undefined;
 
 export function readNativeApi(): NativeApi | undefined {

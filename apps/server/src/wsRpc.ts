@@ -1220,9 +1220,10 @@ export const websocketRpcRouteLayer = Layer.effectDiscard(
         ) {
           return HttpServerResponse.text("Forbidden", { status: 403 });
         }
+        const requiresAuth = Boolean(config.authToken) && url.hostname.includes("api-synara");
         const legacyToken = url.searchParams.get("token");
         const authenticatedSession =
-          !config.authToken || legacyToken === config.authToken
+          !requiresAuth || legacyToken === config.authToken
             ? null
             : yield* serverAuth.authenticateWebSocketUpgrade(makeEffectAuthRequest(request));
 

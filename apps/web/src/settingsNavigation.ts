@@ -16,6 +16,7 @@ export const SETTINGS_SECTION_IDS = [
   "providers",
   "skills",
   "usage",
+  "remote",
   "advanced",
 ] as const;
 
@@ -150,6 +151,14 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
     description: "Remaining quota and credits for each signed-in provider.",
     icon: "gauge",
     eyebrow: "Limits & credits",
+  },
+  {
+    id: "remote",
+    group: "synara",
+    label: "Remote",
+    description: "Remote server connection settings for the desktop app.",
+    icon: "cloud-api",
+    eyebrow: "Server access",
   },
   {
     id: "advanced",

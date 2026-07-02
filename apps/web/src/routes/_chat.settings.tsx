@@ -3159,6 +3159,59 @@ function SettingsRouteView() {
     </div>
   );
 
+  const renderRemotePanel = () => (
+    <div className="space-y-6">
+      <SettingsSection title="Remote server">
+        <SettingsRow
+          title="Server URL"
+          description="The URL of your remote Synara instance."
+          resetAction={
+            settings.remoteServerUrl !== defaults.remoteServerUrl ? (
+              <SettingResetButton
+                label="server URL"
+                onClick={() => updateSettings({ remoteServerUrl: defaults.remoteServerUrl })}
+              />
+            ) : null
+          }
+          control={
+            <DebouncedSettingTextInput
+              size="sm"
+              variant="soft"
+              className="w-full"
+              value={settings.remoteServerUrl}
+              onCommit={(nextValue) => updateSettings({ remoteServerUrl: nextValue })}
+              placeholder="https://example.com"
+              spellCheck={false}
+            />
+          }
+        />
+        <SettingsRow
+          title="API token"
+          description="The auth token for the remote server (T3CODE_AUTH_TOKEN)."
+          resetAction={
+            settings.remoteServerToken !== defaults.remoteServerToken ? (
+              <SettingResetButton
+                label="API token"
+                onClick={() => updateSettings({ remoteServerToken: defaults.remoteServerToken })}
+              />
+            ) : null
+          }
+          control={
+            <DebouncedSettingTextInput
+              size="sm"
+              variant="soft"
+              className="w-full"
+              value={settings.remoteServerToken}
+              onCommit={(nextValue) => updateSettings({ remoteServerToken: nextValue })}
+              placeholder="Enter your API token"
+              spellCheck={false}
+            />
+          }
+        />
+      </SettingsSection>
+    </div>
+  );
+
   const renderAdvancedPanel = () => (
     <div className="space-y-6">
       <SettingsSection title="Developer tools">
@@ -3284,6 +3337,8 @@ function SettingsRouteView() {
         return <SkillsSettingsPanel />;
       case "usage":
         return <ProviderUsageSettingsPanel />;
+      case "remote":
+        return renderRemotePanel();
       case "advanced":
         return renderAdvancedPanel();
       default:

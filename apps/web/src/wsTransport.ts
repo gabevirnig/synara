@@ -114,6 +114,7 @@ export function shouldKeepServerLifecycleStream(activeChannels: ReadonlySet<stri
 
 export class WsTransport {
   private readonly explicitUrl: string | null;
+  private overrideUrl: string | null = null;
   private readonly listeners = new Map<string, Set<(message: WsPush) => void>>();
   private readonly stateListeners = new Set<(state: WsTransportState) => void>();
   private readonly latestPushByChannel = new Map<string, WsPush>();
@@ -137,6 +138,29 @@ export class WsTransport {
     this.runtime = session.runtime;
     this.clientScope = session.clientScope;
     this.clientPromise = session.clientPromise;
+  }
+
+  /**
+   * Switch the WebSocket endpoint. Pass null to revert to the default (bridge/env) URL.
+   * Triggers a full reconnect — all active streams are torn down and re-established.
+   */
+  setOverrideUrl(url: string | null): void {
+    if (this.overrideUrl === url) return;
+    this.overrideUrl = url;
+    // Force reconnect by rejecting the current client promise so getClient()
+    // falls through to reconnect(), which creates a session with the new URL.
+    this.clientPromise = Promise.reject(
+      new Error("Switching WebSocket endpoint"),
+    );
+    void this.reconnect();
+  }
+
+  /**
+   * Resolve the active WebSocket URL, preferring the override URL if set.
+   */
+  private resolveUrl(): string {
+    if (this.overrideUrl) return resolveRpcUrl(this.overrideUrl);
+    return makeSocketUrl(this.explicitUrl);
   }
 
   async request<T = unknown>(
@@ -262,7 +286,7 @@ export class WsTransport {
 
   private createSession() {
     const sessionVersion = ++this.sessionVersion;
-    const runtime = ManagedRuntime.make(makeProtocolLayer(makeSocketUrl(this.explicitUrl)));
+    const runtime = ManagedRuntime.make(makeProtocolLayer(this.resolveUrl()));
     const clientScope = runtime.runSync(Scope.make());
     const clientPromise = runtime
       .runPromise(Scope.provide(clientScope)(makeRpcClient))

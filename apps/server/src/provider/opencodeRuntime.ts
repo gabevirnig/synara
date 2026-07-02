@@ -473,6 +473,12 @@ export function resolveOpenCodeAuthFilePath(
   return join(resolveOpenCodeDataDirectory(pathInfo.home, cliSpec.dataDirectoryName), "auth.json");
 }
 
+export function resolveOpenCodeConfigFilePath(
+  pathInfo: Pick<OpenCodePathInfo, "config">,
+): string {
+  return join(pathInfo.config, "opencode.json");
+}
+
 export function parseOpenCodeCredentialProviderIDs(content: string): ReadonlyArray<string> {
   const parsed = JSON.parse(content) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -483,6 +489,42 @@ export function parseOpenCodeCredentialProviderIDs(content: string): ReadonlyArr
     .flatMap(([providerID, value]) =>
       value && typeof value === "object" && !Array.isArray(value) ? [providerID.trim()] : [],
     )
+    .filter((providerID) => providerID.length > 0)
+    .toSorted((left, right) => left.localeCompare(right));
+}
+
+export function parseOpenCodeConfiguredProviders(content: string): ReadonlyArray<string> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return [];
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return [];
+  }
+
+  const providers = (parsed as Record<string, unknown>).provider;
+  if (!providers || typeof providers !== "object" || Array.isArray(providers)) {
+    return [];
+  }
+
+  return Object.entries(providers as Record<string, unknown>)
+    .filter(([, config]) => {
+      if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return false;
+      }
+      const options = (config as Record<string, unknown>).options;
+      return (
+        options !== undefined &&
+        options !== null &&
+        typeof options === "object" &&
+        !Array.isArray(options) &&
+        Object.keys(options as Record<string, unknown>).length > 0
+      );
+    })
+    .map(([providerID]) => providerID.trim())
     .filter((providerID) => providerID.length > 0)
     .toSorted((left, right) => left.localeCompare(right));
 }
@@ -1371,8 +1413,8 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
   const loadOpenCodeCredentialProviderIDs: OpenCodeRuntimeShape["loadOpenCodeCredentialProviderIDs"] =
     (client, cliSpec = OPENCODE_CLI_SPEC) =>
       loadOpenCodePaths(client).pipe(
-        Effect.flatMap((pathInfo) =>
-          Effect.tryPromise({
+        Effect.flatMap((pathInfo) => {
+          const authProviders = Effect.tryPromise({
             try: () => readFile(resolveOpenCodeAuthFilePath(pathInfo, cliSpec), "utf8"),
             catch: (cause) =>
               new OpenCodeRuntimeError({
@@ -1380,22 +1422,56 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
                 detail: openCodeRuntimeErrorDetail(cause),
                 cause,
               }),
-          }),
-        ),
-        Effect.flatMap((content) =>
-          Effect.try({
-            try: () => parseOpenCodeCredentialProviderIDs(content),
+          }).pipe(
+            Effect.flatMap((content) =>
+              Effect.try({
+                try: () => parseOpenCodeCredentialProviderIDs(content),
+                catch: (cause) =>
+                  new OpenCodeRuntimeError({
+                    operation: "parseOpenCodeCredentialProviderIDs",
+                    detail: openCodeRuntimeErrorDetail(cause),
+                    cause,
+                  }),
+              }),
+            ),
+            // Explicit credential metadata is optional. Discovery should still work when
+            // the auth file does not exist, is unreadable, or belongs to another machine.
+            Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)),
+          );
+
+          const configProviders = Effect.tryPromise({
+            try: () => readFile(resolveOpenCodeConfigFilePath(pathInfo), "utf8"),
             catch: (cause) =>
               new OpenCodeRuntimeError({
-                operation: "parseOpenCodeCredentialProviderIDs",
+                operation: "readOpenCodeConfiguredProviders",
                 detail: openCodeRuntimeErrorDetail(cause),
                 cause,
               }),
-          }),
-        ),
-        // Explicit credential metadata is optional. Discovery should still work when
-        // the auth file does not exist, is unreadable, or belongs to another machine.
-        Effect.catch(() => Effect.succeed([])),
+          }).pipe(
+            Effect.flatMap((content) =>
+              Effect.try({
+                try: () => parseOpenCodeConfiguredProviders(content),
+                catch: (cause) =>
+                  new OpenCodeRuntimeError({
+                    operation: "parseOpenCodeConfiguredProviders",
+                    detail: openCodeRuntimeErrorDetail(cause),
+                    cause,
+                  }),
+              }),
+            ),
+            // Config file is optional.
+            Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)),
+          );
+
+          return Effect.all([authProviders, configProviders], {
+            concurrency: "unbounded",
+          }).pipe(
+            Effect.map(([auth, config]) => {
+              const merged = new Set([...auth, ...config]);
+              return [...merged].toSorted((left, right) => left.localeCompare(right));
+            }),
+          );
+        }),
       );
 
   return {

@@ -43,6 +43,14 @@ import { WsTransport } from "./wsTransport";
 import { emitWsTransportState } from "./wsTransportEvents";
 
 let instance: { api: NativeApi; transport: WsTransport } | null = null;
+
+/**
+ * Switch the WebSocket connection to a remote endpoint, or back to local.
+ * Pass null to revert to the default (local bridge) URL.
+ */
+export function switchWsConnection(wsUrl: string | null): void {
+  instance?.transport.setOverrideUrl(wsUrl);
+}
 const welcomeListeners = new Set<(payload: WsWelcomePayload) => void>();
 const serverConfigUpdatedListeners = new Set<(payload: ServerConfigUpdatedPayload) => void>();
 const serverProviderStatusesUpdatedListeners = new Set<

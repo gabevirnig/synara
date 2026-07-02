@@ -16,7 +16,9 @@ import {
   OpenCodeRuntimeLive,
   OPENCODE_LOCAL_SERVER_IDLE_TTL_MS,
   parseOpenCodeCliModelsOutput,
+  parseOpenCodeConfiguredProviders,
   parseOpenCodeCredentialProviderIDs,
+  resolveOpenCodeConfigFilePath,
   toOpenCodeFileParts,
 } from "./opencodeRuntime.ts";
 
@@ -728,5 +730,83 @@ describe("parseOpenCodeCredentialProviderIDs", () => {
 }`);
 
     expect(providerIDs).toEqual(["openai"]);
+  });
+});
+
+describe("resolveOpenCodeConfigFilePath", () => {
+  it("returns the opencode.json path inside the config directory", () => {
+    const path = resolveOpenCodeConfigFilePath({ config: "/home/user/.config/opencode" });
+    expect(path).toBe("/home/user/.config/opencode/opencode.json");
+  });
+});
+
+describe("parseOpenCodeConfiguredProviders", () => {
+  it("returns provider IDs that have API key options in opencode.json", () => {
+    const providerIDs = parseOpenCodeConfiguredProviders(`{
+  "provider": {
+    "openrouter": {
+      "options": {
+        "apiKey": "sk-or-...",
+        "baseURL": "https://openrouter.ai/api/v1"
+      },
+      "models": {
+        "qwen/qwen3-coder:free": {}
+      }
+    },
+    "xai": {
+      "options": {},
+      "models": {
+        "grok-3": {}
+      }
+    }
+  }
+}`);
+
+    expect(providerIDs).toEqual(["openrouter"]);
+  });
+
+  it("returns multiple providers with options configured", () => {
+    const providerIDs = parseOpenCodeConfiguredProviders(`{
+  "provider": {
+    "openai": {
+      "options": {
+        "apiKey": "sk-..."
+      }
+    },
+    "anthropic": {
+      "options": {
+        "apiKey": "sk-ant-..."
+      }
+    }
+  }
+}`);
+
+    expect(providerIDs).toEqual(["anthropic", "openai"]);
+  });
+
+  it("returns empty array when no provider options are set", () => {
+    const providerIDs = parseOpenCodeConfiguredProviders(`{
+  "provider": {
+    "xai": {
+      "options": {},
+      "models": {}
+    }
+  }
+}`);
+
+    expect(providerIDs).toEqual([]);
+  });
+
+  it("returns empty array when config has no provider section", () => {
+    const providerIDs = parseOpenCodeConfiguredProviders(`{
+  "model": "openai/gpt-4"
+}`);
+
+    expect(providerIDs).toEqual([]);
+  });
+
+  it("returns empty array for invalid JSON", () => {
+    const providerIDs = parseOpenCodeConfiguredProviders("not-json");
+    expect(providerIDs).toEqual([]);
   });
 });
